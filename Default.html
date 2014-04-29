@@ -1,0 +1,39 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>OK, Validation</title>
+	<script src="ok-valid.js" type="text/javascript"></script>
+	<link rel="stylesheet" type="text/css" href="ok-valid.css">
+</head>
+<body>
+	<h1>World's Simplest Validation!</h1>
+	<form action="Submitted.html">
+		<label>Email:</label><input id="primaryEmail" type="text" value="" ok-validation="required email size:8-20" name="Email Address" /><br />
+		<label>Confirm Email:</label><input id="confirmEmail" type="text" value="" ok-validation="required email size:8-20" /><br />
+		<label>Super Confirm Email:</label><input id="superConfirmEmail" type="text" value="" ok-validation="required email size:8-20 sameAs:primaryEmail,confirmEmail" /><br />
+        <label>IP:</label><input id="integerTest" type="text" value="" ok-validation="octal" />
+        <input type="button" ok-validate value="DEFAULT" />
+        <input type="button" ok-validate="targetById" value="DIV 1" />
+        <input type="submit" ok-validate="divOutsideForm" value="SUBMIT - DIV 4" />
+        <input type="button" ok-validate="validationGroup" value="CLASS" />
+        <div id="targetById" class="validationGroup">
+            <h3>Div 1, ID = 'targetById' - class = 'validationGroup'</h3>
+            <input type="text" ok-validation="required" />
+        </div>
+        <div id="targetById">
+            <h3>Div 2</h3>
+            <input type="text" ok-validation="required" />
+        </div>
+        <div id="targetById" class="validationGroup">
+            <h3>Div 3, class = 'validationGroup'</h3>
+            <input type="text" ok-validation="required" />
+        </div>
+	</form>
+    <div id="divOutsideForm">
+        <h3>Div 4, located outside the form.</h3>
+        <input type="text" ok-validation="required" />
+    </div>
+</body>
+</html>
