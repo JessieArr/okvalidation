@@ -1,4 +1,4 @@
-﻿/* 
+﻿/* LICENSE
 OK Validation is proudly published as open source software under the MIT License
 
 The MIT License (MIT)
@@ -27,13 +27,97 @@ THE SOFTWARE.
 $OK = (function(){
 	
     var _validateByArgument = function (validationArgument) {
-        var subtreesToValidate = _getDOMSubtreesFromArgument(validationArgument);
-        var nodesToValidate = _getDOMNodesFromSubtrees(subtreesToValidate);
-
-        nodesToValidate.forEach(_runValidationAttributes);
+		// Add nodes to the collection of nodes to be validate.
+        var validationCollection = _getValidationCollectionByArgument(validationArgument);
+		
+		// Remove nodes from the collection as needed
+		var nodesToValidate = _pruneValidationCollection(validationCollection);
+		
+		// We take care of any pre-validation work we need to, such as removing invalid classes
+		_beforeCollectionValidation(nodesToValidate);
+		
+		// We run validation of all attributes on each node in turn, storing their result objects in an array
+		var validationResultArray = _duringCollectionValidation(nodesToValidate);
+		
+		// Here we do any work that needs to be done after validation, such as applying invalid classes and tooltips
+		_afterCollectionValidation(nodesToValidate, validationResultArray);
     };
-
-    var _getDOMSubtreesFromArgument = function (validationArgument) {
+	
+	// BUILD VALIDATION COLLECTION
+	var _getValidationCollectionByArgument = function(validationArgument){
+		var subtreesToValidate = _getDOMSubtreesFromArgument(validationArgument);
+        var nodesToValidate = _getDOMNodesFromSubtrees(subtreesToValidate);
+		return nodesToValidate;
+	}
+	
+	// PRUNE VALIDATION COLLECTION
+	var _pruneValidationCollection = function(nodesToPrune){
+		return nodesToPrune;
+	}
+	
+	// COLLECTION VALIDATION LIFE CYCLE
+	// BEFORE
+	var _beforeCollectionValidation = function(nodesToValidate){
+		for(var i = 0; i < nodesToValidate.length; i++){
+			var node = nodesToValidate[i];
+			node.classList.remove(_settings.invalidClassName);
+		}
+		_clearValidationTooltips();
+	}
+	
+	// DURING
+	var _duringCollectionValidation = function (nodesToValidate){
+		var validationResultArray = [];
+		for(var i = 0; i < nodesToValidate.length; i++){
+			var result = _runValidationAttributes(nodesToValidate[i]);
+			validationResultArray.push(result);
+		}
+		return validationResultArray;
+	}
+	
+    var _runValidationAttributes = function (node) {
+		var nodeIsValid = true;
+		var resultObject = {node: node, failedResults: []};
+        for (var i = 0; i < _settings.validationAttributes.length; i++) {
+            var lifecycleResult = _validationLifeCycle(node, _settings.validationAttributes[i]);
+			if(!lifecycleResult.valid){
+				nodeIsValid = false;
+				resultObject.failedResults.push(lifecycleResult);
+			}
+        }
+		
+		resultObject.valid = nodeIsValid;
+		return resultObject;
+    }
+	
+	// AFTER
+	var _afterCollectionValidation = function(nodesToValidate, validationResultArray){
+		for(var i = 0; i < validationResultArray.length; i++){
+			var resultObject = validationResultArray[i];
+			if (resultObject.failedResults.length > 0) {
+                resultObject.node.className += ' ' + $OK.settings.invalidClassName;
+				resultObject.node.className = resultObject.node.className.trim();
+				
+				// apply the tooltip with our info about what validation failed.
+				// TODO: make this work for more than one failed result (multiple validation attributes failed)
+				_setValidationTooltip(resultObject.node, resultObject.failedResults[0]);
+				
+				if(!$OK.state.event){
+					return; // no event to do this to
+				}
+				// If preventDefault is not available, we can't stop it.
+				// YOU WIN THIS TIME, EVENT! *shakes fist*
+				// TODO: this.preventDefault should be migrated out of the validationAttribute and into the validation lifecycle.
+                if (this.preventDefault && $OK.state.event.preventDefault) {
+                    $OK.state.event.preventDefault();
+                }
+            }
+		}
+		
+	}
+	
+	// SUBTREE VALIDATION LIFE CYCLE HELPERS
+	var _getDOMSubtreesFromArgument = function (validationArgument) {
 		if(validationArgument){
 			var nodeById = document.getElementById(validationArgument);
 			if (nodeById) {
@@ -50,8 +134,7 @@ $OK = (function(){
 				return [];
 			}
 			return [_findDefaultParentForValidation(publicObject.state.event.target)];
-		}
-        
+		}        
     };
 
     var _findDefaultParentForValidation = function (node) {
@@ -82,30 +165,16 @@ $OK = (function(){
         return nodes;
     }
 
-    var _runValidationAttributes = function (node) {
-		var nodeIsValid = true;
-        for (var i = 0; i < _settings.validationAttributes.length; i++) {
-            var resultObject = _validationLifeCycle(node, _settings.validationAttributes[i]);
-			if(!resultObject.valid){
-				nodeIsValid = false;
-								
-				// apply the tooltip with our info about what validation failed.
-				_setValidationTooltip(node, resultObject);
-			}
-        }
-		return nodeIsValid;
-    }
-
+	// NODE VALIDATION LIFECYCLE
     var _validationLifeCycle = function (node, validationAttribute) {
 
         if (!node.getAttribute(validationAttribute.attribute))
             return {valid: true}; // This node does not contain the attribute, we return valid
 
         // Result object will be passed into each step in the lifecycle to allow for statefulness if needed
-        var resultObject = {};
+        var resultObject = { valid: true };
 
         // the validationAttribute is given a chance to handle any actions needed before doing validation
-        // such as removing invalid classes from the element before validating
         if (validationAttribute.beforeValidate) {
             var returnedObject = validationAttribute.beforeValidate(node);
             if (returnedObject) {
@@ -122,7 +191,6 @@ $OK = (function(){
         }
 
         // the validationAttribute is given a chance to handle any actions needed after doing validation
-        // such as decorating the element with an invalid class
         if (validationAttribute.afterValidate) {
             var returnedObject = validationAttribute.afterValidate(node, resultObject);
             if (returnedObject) {
@@ -130,11 +198,11 @@ $OK = (function(){
             }
         }
 
-        if (validationAttribute.valid) {
+        if (validationAttribute.valid && resultObject.valid) {
             validationAttribute.valid(node, resultObject);
         }
 
-        if (validationAttribute.invalid) {
+        if (validationAttribute.invalid && !resultObject.valid) {
             validationAttribute.invalid(node, resultObject);
         }
 
@@ -187,6 +255,7 @@ $OK = (function(){
 		}
 	}
 	
+	var tooltipObjects = [];
 	var _setValidationTooltip = function(node, resultObject){
 		var tooltip = document.getElementById('okValidationTooltip');
 		if(!tooltip){
@@ -201,24 +270,39 @@ $OK = (function(){
 			tooltipInnerHTML += '<li>' + resultObject.validationMessages[i] + '</li>\n';
 		}
 		
-		node.addEventListener("mouseover", function(){
+		var tooltipMouseover = function(){
 			var tooltip = document.getElementById('okValidationTooltip');
 			tooltip.innerHTML = tooltipInnerHTML;
 			tooltip.setAttribute('style', 'display: block; position: absolute;');
-		});
+		}
+		node.addEventListener("mouseover", tooltipMouseover);
 		
-		node.addEventListener("mousemove", function(event){
+		var tooltipMousemove = function(event){
 			var tooltip = document.getElementById('okValidationTooltip');
 			var x = event.pageX + 20;
 			var y = event.pageY - 10;
 			tooltip.style.left = x + 'px';
 			tooltip.style.top = y + 'px';
-		});
+		}
+		node.addEventListener("mousemove", tooltipMousemove);
 		
-		node.addEventListener("mouseout", function(){
+		var tooltipMouseout = function(){
 			var tooltip = document.getElementById('okValidationTooltip');
 			tooltip.setAttribute('style', 'display: none;');
-		});
+		}
+		node.addEventListener("mouseout", tooltipMouseout);
+		
+		var tooltipObject = {node: node, mouseover: tooltipMouseover, mousemove: tooltipMousemove, mouseout: tooltipMouseout};
+		tooltipObjects.push(tooltipObject);
+	}
+	
+	var _clearValidationTooltips = function(){
+		for(var i = 0; i < tooltipObjects.length; i++){
+			var obj = tooltipObjects[i];
+			obj.node.removeEventListener("mouseover", obj.mouseover);
+			obj.node.removeEventListener("mousemove", obj.mousemove);
+			obj.node.removeEventListener("mouseout", obj.mouseout);
+		}
 	}
 
     // OKVALIDATION SETUP AND HELPERS
@@ -297,7 +381,7 @@ var okValidation = function () {
             style.innerHTML = '.cssClass { color: #F00; }';
             document.getElementsByTagName('head')[0].appendChild(style);
         },
-        beforeValidate: function (node, resultObject) { node.classList.remove($OK.settings.invalidClassName); },
+        beforeValidate: function (node, resultObject) {  },
         validate: function (node, resultObject) {
 			// We set this here so that if a user forgets to set it, it defaults to true.
             resultObject.valid = true;
@@ -329,23 +413,7 @@ var okValidation = function () {
         },
         afterValidate: function (node, resultObject) {  },
         valid: function (node, resultObject) { if (resultObject.valid) console.log('valid!'); },
-        invalid: function (node, resultObject)
-        {
-            if (!resultObject.valid) {
-                node.className += ' ' + $OK.settings.invalidClassName;
-				node.className = node.className.trim();
-				
-				if(!$OK.state.event){
-					return; // no event to do this to
-				}
-				// If preventDefault is not available, we can't stop it.
-				// YOU WIN THIS TIME, EVENT! *shakes fist*
-				// TODO: this.preventDefault should be migrated out of the validationAttribute and into the validation lifecycle.
-                if (this.preventDefault && $OK.state.event.preventDefault) {
-                    $OK.state.event.preventDefault();
-                }
-            } 
-        },
+        invalid: function (node, resultObject){  },
         validationTypes: {},
         logFailedValidation: function(node, validationType){
             var nodeLogId = node.id;

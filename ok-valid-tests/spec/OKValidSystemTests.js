@@ -13,7 +13,7 @@ describe("SYSTEM TESTS", function() {
   
 	it('Jasmine runs once the DOM is done loading', function() {
 	    var submitButton = document.getElementById('submitButton');
-        expect($OK.validateNode(submitButton)).toBe(true);
+        expect($OK.validateNode(submitButton).valid).toBe(true);
 	});
 	
 	it('clicking Submit button causes validation to run', function(){
@@ -35,6 +35,16 @@ describe("SYSTEM TESTS", function() {
 		expect(emptyRequiredInput.className).toBe('okInvalid');
 	});
 	
+	it('an input that had the invalid class should not still have it after its value is corrected.', function(){
+		var submitButton = document.getElementById('submitButton');
+		var emptyRequiredInput = document.getElementById('emptyRequiredInput');
+		emptyRequiredInput.value = 'something';
+		
+		submitButton.click();
+		expect(emptyRequiredInput.className).toBe('');
+		emptyRequiredInput.value = '';
+	});
+	
 	it('an element that has an invalid value should display a tooltip on hover', function(){
 		var submitButton = document.getElementById('submitButton');
 		var emptyRequiredInput = document.getElementById('emptyRequiredInput');
@@ -54,6 +64,20 @@ describe("SYSTEM TESTS", function() {
 		raiseMouseEvent(emptyRequiredInput, 'mouseover');
 		raiseMouseEvent(emptyRequiredInput, 'mouseout');		
 		expect(tooltip.style.display).toBe('none');
+	});
+	
+	it('an element that is displaying a tooltip should not show it on hover after its value is corrected and submitted', function(){
+		var submitButton = document.getElementById('submitButton');
+		var emptyRequiredInput = document.getElementById('emptyRequiredInput');
+		var tooltip = document.getElementById('okValidationTooltip');
+		
+		emptyRequiredInput.value = 'something';
+		
+		submitButton.click();
+		raiseMouseEvent(emptyRequiredInput, 'mouseover');	
+		expect(tooltip.style.display).toBe('none');
+		
+		emptyRequiredInput.value = '';
 	});
 	
 	it('an element that has a valid value should NOT have the invalid class', function(){
