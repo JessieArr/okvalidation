@@ -52,8 +52,24 @@ $OK = (function(){
 	
 	// PRUNE VALIDATION COLLECTION
 	var _pruneValidationCollection = function(nodesToPrune){
+		for(var i = 0; i < nodesToPrune.length; i++){
+			var result = _runConditionalAttributes(nodesToPrune[i]);
+			if(!result){
+				nodesToPrune.splice(i, 1);
+			}
+		}
 		return nodesToPrune;
 	}
+	
+	var _runConditionalAttributes = function (node) {
+        for (var i = 0; i < _settings.conditionalAttributes.length; i++) {
+            var passedCondition = _settings.conditionalAttributes[i].predicate(node);
+			if(!passedCondition){
+				return false;
+			}
+        }
+		return true;
+    }
 	
 	// COLLECTION VALIDATION LIFE CYCLE
 	// BEFORE
@@ -219,6 +235,7 @@ $OK = (function(){
 
 	var _settings = {
 	    setupAttributes: [],
+		conditionalAttributes: [],
         validationAttributes: [],
 		invalidClassName: 'okInvalid',
 		preventDefault: true
@@ -241,6 +258,18 @@ $OK = (function(){
 	    for (var i = 0; i < _settings.setupAttributes.length; i++) {
 	        _settings.setupAttributes[i].setup(node);
 	    }
+	}
+	
+	// CONDITIONAL ATTRIBUTES
+	var _setConditionalAttribute = function (newConditionalAttribute) {
+	    if (!newConditionalAttribute.attribute) {
+	        throw new Error('ERROR: an attempt to add a new Conditional Attribute without an attribute property. The attribute property is the HTML attribute used to determine when to apply the conditional.')
+	    }
+	    _settings.conditionalAttributes.push(newConditionalAttribute);
+		
+		if(newConditionalAttribute.attribute == 'ok-validate-if'){
+			publicObject.okValidateIfInstance = newConditionalAttribute;
+		}
 	}
 
     // VALIDATION ATTRIBUTES
@@ -313,13 +342,25 @@ $OK = (function(){
     // OKVALIDATION SETUP AND HELPERS
 	var _setOKValidationArgument = function (newOKValidationArgument) {
 		var okValidationInstance = publicObject.okValidationInstance;
-		var existingValidationArgument = okValidationInstance.validationArguments[newOKValidationArgument.argument];
+		var existingValidationArgument = publicObject.okValidationInstance.validationArguments[newOKValidationArgument.argument];
 		if(existingValidationArgument &&
 			existingValidationArgument !== newOKValidationArgument){
 			// If we're overwriting another instance of this validation type, we log it to help with debugging.
 			console.log('overwriting ' + newOKValidationArgument.argument + ' validationArgument for okValidation.');
 		}
 	    okValidationInstance.validationArguments[newOKValidationArgument.argument] = newOKValidationArgument;
+	}	
+	
+	// OKVALIDATEIF SETUP AND HELPERS
+	var _setOKValidateIfArgument = function (newOKValidateIfArgument) {
+		var okValidateIfInstance = publicObject.okValidateIfInstance;
+		var existingValidateIfArgument = publicObject.okValidateIfInstance.conditionalArguments[newOKValidateIfArgument.argument];
+		if(existingValidateIfArgument &&
+			existingValidateIfArgument !== newOKValidateIfArgument){
+			// If we're overwriting another instance of this validation type, we log it to help with debugging.
+			console.log('overwriting ' + newOKValidateIfArgument.argument + ' conditionalArguments for okValidateIf.');
+		}
+	    okValidateIfInstance.conditionalArguments[newOKValidateIfArgument.argument] = newOKValidateIfArgument;
 	}	
 	
 	// **** Page Setup
@@ -336,9 +377,12 @@ $OK = (function(){
 		settings: _settings,
 		validateByArgument: _validateByArgument,
 	    setSetupAttribute: _setSetupAttribute,
+		setConditionalAttribute: _setConditionalAttribute,
 		setValidationAttribute: _setValidationAttribute,
 		setOKValidationArgument: _setOKValidationArgument, // We give the OKValidation attribute some special treatment here
+		setOKValidateIfArgument: _setOKValidateIfArgument, // We give the OKValidateIf attribute some special treatment here
 		okValidationInstance: {},
+		okValidateIfInstance: {},
 		validateNode: _runValidationAttributes,
 		state: {},
 	};
@@ -356,6 +400,8 @@ $OK = (function(){
 	}
 	return publicObject;
 })();
+
+
 
 // ADDING SETUP ATTRIBUTES
 var okValidate = function () {
@@ -376,7 +422,75 @@ var okValidate = function () {
         }
     };
 }
-$OK.setSetupAttribute(okValidate());
+$OK.setSetupAttribute(okValidate())
+
+var okValidateIf = function(){
+	return {
+		attribute: 'ok-validate-if',
+		predicate: function (node) {
+            var okValidateIfAttribute = node.getAttribute(this.attribute);
+			
+			if(!okValidateIfAttribute){
+				// If the node doesn't have this attribute, it passes our condition
+				return true;
+			}
+			
+            var arguments = okValidateIfAttribute.split(' ');
+            for (var i = 0; i < arguments.length; i++) {
+                var argumentParts = arguments[i].split(this.delimiters);
+				
+				var targetNode = document.getElementById(argumentParts[0]);
+				if(!targetNode){
+					console.log(this.attribute + ' failed to find conditional target with ID: ' + argumentParts[0]);
+				}
+
+                if (!this.conditionalArguments[argumentParts[1]]) {
+                    var nodeLogId = node.id;
+                    var nodeTagName = node.tagName;
+                    if (nodeLogId) {
+                        console.log('Unknown argument to ' + this.attribute + ': ' + arguments[i] + ' on ' + nodeTagName + ' element with ID: ' + nodeLogId + '.');
+                    }
+                    else {
+                        console.log('Unknown argument to ' + this.attribute + ': ' + arguments[i] + ' on ' + nodeTagName + 'element.');
+                    }	                    
+                    continue;
+                }
+				
+                var passedConditional = this.conditionalArguments[argumentParts[1]].predicate(targetNode, argumentParts[2]);
+				if(!passedConditional){
+					// One of our conditions failed, all must be true.
+					return false;
+				}
+            }
+            return true;
+        },
+		conditionalArguments: {},
+		delimiters: /[\(:\)]/g,
+	};
+}
+$OK.setConditionalAttribute(okValidateIf());
+
+var hasValue = function(){
+	return {
+        argument: 'hasValue',
+        predicate: function (targetNode, argument) {
+            if (targetNode.value == argument)
+                return true;
+            return false;
+        }
+	}
+}
+$OK.setOKValidateIfArgument(hasValue());
+
+var isChecked = function(){
+	return {
+        argument: 'isChecked',
+        predicate: function (targetNode) {
+            return targetNode.checked
+        }
+	}
+}
+$OK.setOKValidateIfArgument(isChecked());
 
 // ADDING VALIDATION ARRTIBUTES
 var okValidation = function () {

@@ -16,7 +16,8 @@
 		<label>Email:</label><input id="primaryEmail" type="text" value="" ok-validation="required email size:8-20" name="Email Address" /><br />
 		<label>Confirm Email:</label><input id="confirmEmail" type="text" value="" ok-validation="required email size:8-20" /><br />
 		<label>Super Confirm Email:</label><input id="superConfirmEmail" type="text" value="" ok-validation="required email size:8-20 sameAs:primaryEmail,confirmEmail" /><br />
-        <label>IP:</label><input id="integerTest" type="text" value="" ok-regex="phoneNumber" />
+        <label>IP:</label><input id="integerTest" type="text" value="" ok-regex="phoneNumber" ok-validate-if="conditionalCheckbox:isChecked" />
+		<input id="conditionalCheckbox" type="checkbox" />
         <input type="button" ok-validate value="DEFAULT" />
         <input type="button" ok-validate="targetById" value="DIV 1" />
         <input type="submit" ok-validate="divOutsideForm" value="SUBMIT - DIV 4" />
