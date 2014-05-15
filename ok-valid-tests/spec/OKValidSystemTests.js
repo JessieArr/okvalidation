@@ -87,6 +87,16 @@ describe("SYSTEM TESTS", function() {
 		submitButton.click();
 		expect(requiredInputWithValue.className).not.toBe('okInvalid');
 	});	
+	
+	it('an element that fails validation for a validationAttribute which generates no message should not show a tooltip on hover', function(){
+		var submitButton = document.getElementById('submitButton');
+		var delegateRegexInput = document.getElementById('delegateRegexInput');
+		var tooltip = document.getElementById('okValidationTooltip');
+				
+		submitButton.click();
+		raiseMouseEvent(delegateRegexInput, 'mouseover');	
+		expect(tooltip.style.display).toBe('none');
+		});	
 });
 
 function raiseMouseEvent(element, eventName){

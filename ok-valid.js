@@ -107,8 +107,7 @@ $OK = (function(){
 				}
 				// If preventDefault is not available, we can't stop it.
 				// YOU WIN THIS TIME, EVENT! *shakes fist*
-				// TODO: this.preventDefault should be migrated out of the validationAttribute and into the validation lifecycle.
-                if (this.preventDefault && $OK.state.event.preventDefault) {
+                if (_settings.preventDefault && $OK.state.event.preventDefault) {
                     $OK.state.event.preventDefault();
                 }
             }
@@ -221,7 +220,8 @@ $OK = (function(){
 	var _settings = {
 	    setupAttributes: [],
         validationAttributes: [],
-		invalidClassName: 'okInvalid'
+		invalidClassName: 'okInvalid',
+		preventDefault: true
 	};
 
     // SETUP ATTRIBUTES
@@ -257,6 +257,11 @@ $OK = (function(){
 	
 	var tooltipObjects = [];
 	var _setValidationTooltip = function(node, resultObject){
+		if(resultObject.validationMessages.length == 0){
+			// No tooltip to show, we just quit.
+			return;
+		}
+	
 		var tooltip = document.getElementById('okValidationTooltip');
 		if(!tooltip){
 			tooltip = document.createElement('div');
@@ -308,13 +313,13 @@ $OK = (function(){
     // OKVALIDATION SETUP AND HELPERS
 	var _setOKValidationArgument = function (newOKValidationArgument) {
 		var okValidationInstance = publicObject.okValidationInstance;
-		var existingValidationArgument = okValidationInstance.validationTypes[newOKValidationArgument.argument];
+		var existingValidationArgument = okValidationInstance.validationArguments[newOKValidationArgument.argument];
 		if(existingValidationArgument &&
 			existingValidationArgument !== newOKValidationArgument){
 			// If we're overwriting another instance of this validation type, we log it to help with debugging.
 			console.log('overwriting ' + newOKValidationArgument.argument + ' validationArgument for okValidation.');
 		}
-	    okValidationInstance.validationTypes[newOKValidationArgument.argument] = newOKValidationArgument;
+	    okValidationInstance.validationArguments[newOKValidationArgument.argument] = newOKValidationArgument;
 	}	
 	
 	// **** Page Setup
@@ -335,8 +340,10 @@ $OK = (function(){
 		setOKValidationArgument: _setOKValidationArgument, // We give the OKValidation attribute some special treatment here
 		okValidationInstance: {},
 		validateNode: _runValidationAttributes,
-		state: {}
+		state: {},
 	};
+	
+	// Jasmine setup to allow testing.
 	if(this.describe){
 		// If Jasmine exists, we assume we're testing and expose some extra bits. Don't judge me, testing JS closures is hard.
 		publicObject.getValidateByArgument = function(){
@@ -375,12 +382,6 @@ $OK.setSetupAttribute(okValidate());
 var okValidation = function () {
     return {
         attribute: 'ok-validation',
-        pageSetup: function () {
-            var style = document.createElement('style');
-            style.type = 'text/css';
-            style.innerHTML = '.cssClass { color: #F00; }';
-            document.getElementsByTagName('head')[0].appendChild(style);
-        },
         beforeValidate: function (node, resultObject) {  },
         validate: function (node, resultObject) {
 			// We set this here so that if a user forgets to set it, it defaults to true.
@@ -391,7 +392,7 @@ var okValidation = function () {
             for (var i = 0; i < arguments.length; i++) {
                 var argumentParts = arguments[i].split(this.delimiter);
 
-                if (!this.validationTypes[argumentParts[0]]) {
+                if (!this.validationArguments[argumentParts[0]]) {
                     var nodeLogId = node.id;
                     var nodeTagName = node.tagName;
                     if (nodeLogId) {
@@ -402,35 +403,81 @@ var okValidation = function () {
                     }	                    
                     continue;
                 }
-                var passedValidation = this.validationTypes[argumentParts[0]].validate(node, argumentParts[1]);
+                var passedValidation = this.validationArguments[argumentParts[0]].validate(node, argumentParts[1]);
                 if (!passedValidation) {
-                    this.logFailedValidation(node, this.validationTypes[argumentParts[0]]);
-					resultObject.validationMessages.push(this.validationTypes[argumentParts[0]].validationMessage);
+                    this.logFailedValidation(node, this.validationArguments[argumentParts[0]]);
+					resultObject.validationMessages.push(this.validationArguments[argumentParts[0]].validationMessage);
                     resultObject.valid = false;
                 }
             }
             return resultObject;
         },
         afterValidate: function (node, resultObject) {  },
-        valid: function (node, resultObject) { if (resultObject.valid) console.log('valid!'); },
         invalid: function (node, resultObject){  },
-        validationTypes: {},
-        logFailedValidation: function(node, validationType){
+        validationArguments: {},
+        logFailedValidation: function(node, validationArgument){
             var nodeLogId = node.id;
             var nodeTagName = node.tagName;
             if (nodeLogId) {
-                console.log(validationType.argument + ' validation failed with value: "' + node.value + '" for ' + nodeTagName + ' element with ID: ' + nodeLogId + '.');
+                console.log(validationArgument.argument + ' validation failed with value: "' + node.value + '" for ' + nodeTagName + ' element with ID: ' + nodeLogId + '.');
             }
             else {
-                console.log(validationType.argument + ' validation failed with value: "' + node.value + '" for ' + nodeTagName + ' element.');
+                console.log(validationArgument.argument + ' validation failed with value: "' + node.value + '" for ' + nodeTagName + ' element.');
             }	
         },
         delimiter: ':',
-        preventDefault: true,
-        invalidClassName: 'okInvalid'
     }
 }
 $OK.setValidationAttribute(okValidation());
+
+var okRegex = function () {
+    return {
+        attribute: 'ok-regex',
+        beforeValidate: function (node, resultObject) {  },
+        validate: function (node, resultObject) {
+			// We set this here so that if a user forgets to set it, it defaults to true.
+            resultObject.valid = true;
+			resultObject.validationMessages = [];
+            var okRegexAttribute = node.getAttribute(this.attribute);
+            var regex;
+			if(okRegexAttribute[0] == '/'){
+				// If the first character of the argument is a slash, we treat it as a JS regex object and evaluate it
+				regex = eval(okRegexAttribute);
+			}
+			else{
+				// Else we assume that the argument is a delegate function which will return a regex for us.
+				regex = eval(okRegexAttribute + '();');
+			}
+			
+			if(!node.value){
+				// If the node has no value, we evaluate the regex against empty string
+				passedValidation = ''.match(regex);
+			}
+			else{
+				passedValidation = node.value.match(regex);
+			}			
+            if (!passedValidation) {
+                this.logFailedValidation(node, regex);
+                resultObject.valid = false;
+            }
+            return resultObject;
+        },
+        afterValidate: function (node, resultObject) {  },
+        invalid: function (node, resultObject){  },
+        validationArguments: {},
+        logFailedValidation: function(node, regex){
+            var nodeLogId = node.id;
+            var nodeTagName = node.tagName;
+            if (nodeLogId) {
+                console.log('ok-regex validation failed for regex ' + regex.toString() + ' with value: "' + node.value + '" for ' + nodeTagName + ' element with ID: ' + nodeLogId + '.');
+            }
+            else {
+                console.log('ok-regex validation failed for regex ' + regex.toString() + ' with value: "' + node.value + '" for ' + nodeTagName + ' element.');
+            }	
+        },
+    }
+}
+$OK.setValidationAttribute(okRegex());
 
 // Here we set some default ValidationArguments for the OKValidation attribute. Overwrite these if you want other behavior.
 var required = function () {

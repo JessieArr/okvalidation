@@ -1,4 +1,4 @@
-describe("FUNCTION: validateNode", function() {
+describe("ok-validation Unit Tests", function() {
   var blankNode;
   blankNode = document.createElement('form');
   
@@ -303,5 +303,46 @@ describe("FUNCTION: validateNode", function() {
         expect($OK.validateNode(node).valid).toBe(false);
 	  });
     });
+  });
+});
+
+regexDelegate = function(){ return /.+/gi; };
+describe("ok-regex Unit Tests", function() {
+  var blankNode;
+  blankNode = document.createElement('form');
+  
+  var inlineRegex;
+  inlineRegex = document.createElement('form');
+  inlineRegex.setAttribute('ok-regex', '/.+/');
+  
+  var delegateRegex;
+  delegateRegex = document.createElement('form');
+  delegateRegex.setAttribute('ok-regex', 'regexDelegate');
+  
+  beforeEach(function() {
+  });
+
+  it('node with no validation attribute should pass', function() {
+    expect($OK.validateNode(blankNode).valid).toBe(true);
+  });
+  
+  it('node with inline regex argument \'/.+/\' should pass if it has any value', function() {
+	inlineRegex.value = 'something';
+    expect($OK.validateNode(inlineRegex).valid).toBe(true);
+  });
+  
+  it('node with inline regex argument \'/.+/\' should fail if it has no value', function() {
+	inlineRegex.value = null;
+    expect($OK.validateNode(inlineRegex).valid).toBe(false);
+  });
+  
+  it('node with regex delegate argument \'regexDelegate\' which returns /.+/ should pass if it has any value', function() {
+	inlineRegex.value = 'something';
+    expect($OK.validateNode(inlineRegex).valid).toBe(true);
+  });
+  
+  it('node with regex delegate argument \'regexDelegate\' which returns /.+/ should fail if it has no value', function() {
+	inlineRegex.value = null;
+    expect($OK.validateNode(inlineRegex).valid).toBe(false);
   });
 });
