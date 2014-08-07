@@ -253,7 +253,7 @@ $OK = (function(){
     };
 	
 	createCSSSelector('.okInvalid', 'background-color: #FAA;');
-	createCSSSelector('#okValidationTooltip', 'background-color: #FFC; border-style:solid; border-color:#000; padding:10px; border-radius:5px;');
+	createCSSSelector('#okValidationTooltip', 'background-color: #FFC; border-style:solid; border-color:#000; padding:10px; border-radius:5px; color:#666666;');
 
 	var _settings = {
 	    setupAttributes: [],
