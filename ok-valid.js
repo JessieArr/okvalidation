@@ -27,20 +27,33 @@ THE SOFTWARE.
 $OK = (function(){
 	
     var _validateByArgument = function (validationArgument) {
-		// Add nodes to the collection of nodes to be validate.
+        // Add nodes to the collection of nodes to be validate.
         var validationCollection = _getValidationCollectionByArgument(validationArgument);
 		
-		// Remove nodes from the collection as needed
-		var nodesToValidate = _pruneValidationCollection(validationCollection);
+        // Remove nodes from the collection as needed
+        var nodesToValidate = _pruneValidationCollection(validationCollection);
 		
-		// We take care of any pre-validation work we need to, such as removing invalid classes
-		_beforeCollectionValidation(nodesToValidate);
+        // We take care of any pre-validation work we need to, such as removing invalid classes
+        _beforeCollectionValidation(nodesToValidate);
 		
-		// We run validation of all attributes on each node in turn, storing their result objects in an array
-		var validationResultArray = _duringCollectionValidation(nodesToValidate);
+        // We run validation of all attributes on each node in turn, storing their result objects in an array
+        var validationResultArray = _duringCollectionValidation(nodesToValidate);
 		
-		// Here we do any work that needs to be done after validation, such as applying invalid classes and tooltips
-		_afterCollectionValidation(nodesToValidate, validationResultArray);
+        // Here we do any work that needs to be done after validation, such as applying invalid classes and tooltips
+        _afterCollectionValidation(nodesToValidate, validationResultArray);
+
+        var returnObject = {
+            valid: true,
+            validationResults: validationResultArray,
+        };
+		for (var i = 0; i < validationResultArray.length; i++) {
+		    if (!validationResultArray[i].valid) {
+		        returnObject.valid = false;
+		        continue;
+		    }
+		}
+		
+		return returnObject;
     };
 	
 	// BUILD VALIDATION COLLECTION
@@ -75,8 +88,17 @@ $OK = (function(){
 	// BEFORE
 	var _beforeCollectionValidation = function(nodesToValidate){
 		for(var i = 0; i < nodesToValidate.length; i++){
-			var node = nodesToValidate[i];
-			node.classList.remove(_settings.invalidClassName);
+		    var node = nodesToValidate[i];
+		    if (node.classList) {
+		        node.classList.remove(_settings.invalidClassName);
+		    } else {
+		        var classes = node.className.split(' ');
+		        for (var j = 0; j < classes.length; j++) {
+		            if (classes[j] == _settings.invalidClassName) {
+		                classes.splice(j, 1);
+		            }
+		        }
+		    }			
 		}
 		_clearValidationTooltips();
 	}
